@@ -1,0 +1,260 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    app: {{ .Release.Name }}
+    cluster: {{ .Values.cluster }}
+  namespace: {{ .Values.nameSpace }}
+spec:
+  replicas: {{ .Values.replicaCount | default 1 }}
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}
+      cluster: {{ .Values.cluster }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}
+        cluster: {{ .Values.cluster }}
+    spec:
+      containers:
+        - name: {{ .Release.Name }}
+          image: {{ .Values.imageRepository }}
+          imagePullPolicy: {{ .Values.imagePullPolicy | default "Always" }}
+          ports:
+            - containerPort: {{ .Values.containerPort }}
+              protocol: TCP
+            - containerPort: 9091
+              name: metrics
+              protocol: TCP
+            - containerPort: 9010
+              name: jmxremote
+              protocol: TCP
+          env:
+            - name: CONFIG_FILE
+              value: /appconfig
+            - name: GOOGLE_APPLICATION_CREDENTIALS
+              value: /secrets/pubsub_spanner/key.json
+            # Google project id should not be used in k8s, it should be fetched by app such as ServiceOptions.
+            - name: GOOGLE_PROJECT_ID
+              value: {{ .Values.googleProjectID }}
+            # Health check should always be enabled and must be removed from helm chart. As current application does not have healthcheck, we have this as a place holder. Once healthcheck is added to the app, remove it.
+            - name: JAVA_TOOL_OPTIONS
+              value: {{ .Values.javatooloptions }}
+            - name: JAVA_OPTS
+              value: {{ .Values.javaopts }}
+            {{- if .Values.PASSPHRASE }}
+            - name: PASSPHRASE
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.certPathSecretName }}
+                  key: passphrase
+            {{- end }}
+            {{- if .Values.JKSPASSPHRASE }}
+            - name: JKSPASSPHRASE
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.jksSecretName }}
+                  key: jkspassphrase
+            {{- end }}
+            {{- if .Values.MKP_DCR_KEY_ENABLED }}
+            - name: MKP_DCR_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.mkpdcrpendingreturnsecret }}
+                  key: mkpdcrpendingreturnsecret
+            {{- end }}
+            {{- if .Values.ESA_CERT_TRUSTSTORE_PASSWORD }}
+            - name: ESA_CERT_TRUSTSTORE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.essecret }}
+                  key: esapassword
+            {{- end }}
+            {{- if .Values.PEMPASSPHRASE }}
+            - name: PEMPASSPHRASE
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.pemSecretName }}
+                  key: passphrase
+            {{- end }}
+            {{- if .Values.MCHUBPASSPHRASE }}
+            - name: MCHUBPASSPHRASE
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.mchubSecretName }}
+                  key: mchubjkspassphrase
+            {{- end }}
+            {{- if .Values.FCC_CLIENT_ID }}
+            - name: FCC_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.fccclientid }}
+                  key: fccId
+            {{- end }}
+            {{- if .Values.PFL_API_KEY }}
+            - name: PFL_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.pflapikey }}
+                  key: pflapi
+            {{- end }}
+            {{- if .Values.ESA_API_KEY }}
+            - name: ESA_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.esapikey }}
+                  key: esapiID
+            {{- end }}
+            {{- if .Values.ESA_API_SECRET }}
+            - name: ESA_API_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.esapikeysecret }}
+                  key: esapisecret
+            {{- end }}
+            {{- if .Values.RCS_DCR_KEY_ENABLED }}
+            - name: RCS_DCR_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.rcsdcrpendingreturnsecret }}
+                  key: rcsdcrpendingreturnsecret
+            {{- end }}
+            {{- if .Values.REDFROGJKSCERT }}
+            - name: REDFROGJKSCERT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.redfrogSecretName }}
+                  key: redfrogjkscert
+            {{- end }}
+            # for warrantymanagement microservice
+            {{- if eq .Values.httpPath "/warrantymanagement-service"}}
+            - name: SPANNER_DATABASE_NAME
+              value: {{ .Values.spanner_database_name }}
+            - name: SPANNER_INSTANCE_NAME
+              value: {{ .Values.spanner_instance_name }}
+            - name: UNITERS_DAY_INTERVAL
+              value: {{ .Values.uniters_day_interval }}
+            - name: UNITERS_DELIVERY_STATUS_CODE
+              value: {{ .Values.uniters_delivery_status_code}}
+            - name: UNITERS_EXCEPTION_RETAILBRAND_LIST
+              value: {{ .Values.uniters_exception_retailbrand_list }}
+            - name: UNITERS_KIDSKU_DEPARTMENT
+              value: {{ .Values.uniters_kidsku_department }}
+            - name: UNITERS_THRESHOLD_LIMIT
+              value: {{ .Values.uniters_threshold_limit }}
+            - name: UNITERS_URI
+              value: {{ .Values.uniters_uri }}
+            {{- end }}
+              # uniters Authentication for disabled default for all microservices
+              # True - For enabling authentication
+            {{- if .Values.appsecretsEnabled }}
+            - name: UNITERS_USER_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.unitersCreds }}
+                  key: uniters_user_name
+            - name: UNITERS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.unitersCreds }}
+                  key: uniters_password
+            - name: UNITERS_ACCESS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.unitersCreds }}
+                  key: uniters_access_token
+            {{- end }}
+            {{- if .Values.cheetahsecretsEnabled }}
+            - name: CHEETAH-SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.cheetahSecret }}
+                  key: secret
+            {{- end }}      
+          livenessProbe:
+            httpGet:
+            {{- if .Values.httpGetPath }}
+              path: {{ .Values.httpGetPath }}
+            {{- else }}
+              path: "{{ .Release.Name }}/actuator/health"
+            {{- end }}
+              port: {{ .Values.containerPort }}
+            initialDelaySeconds: {{ .Values.initialDelaySeconds | default 60 }}
+            periodSeconds: 120
+            timeoutSeconds: 90
+          readinessProbe:
+            httpGet:
+            {{- if .Values.httpGetPath }}
+              path: {{ .Values.httpGetPath }}
+            {{- else }}
+              path: "{{ .Release.Name }}/actuator/health"
+            {{- end }}
+              port: {{ .Values.containerPort }}
+            initialDelaySeconds: {{ .Values.initialDelaySeconds | default 60 }}
+            periodSeconds: 120
+            timeoutSeconds: 90
+          resources:
+            requests:
+              memory: {{ .Values.requestMemory | default "2Gi" | quote }}
+              cpu: {{ .Values.requestCPU | default "0.1" | quote }}
+            limits:
+              memory: {{ .Values.limitsMemory | default "4Gi" | quote }}
+              cpu: {{ .Values.limitsCPU | default "1" | quote }}
+          volumeMounts:
+            - mountPath: /appconfig
+              name: appconfig
+            - mountPath: /secrets/pubsub_spanner/
+              name: pubsub-spanner-key
+            - mountPath: /usr/local/share/ca-certificates
+              name: cert-path
+              readOnly: true
+      imagePullSecrets:
+      - name: {{ .Values.imageSecret | default "gcrsecret" }}
+      {{- if .Values.etcHostEnabled }}
+      hostAliases:
+      {{- range $key, $val := .Values.etcHosts }}
+      - hostnames:
+        - {{ $val }}
+        ip: {{ $key }}
+      {{- end }}
+      {{- end }}
+      volumes:
+        - name: appconfig
+          configMap:
+            name: {{ .Values.appConfigMapName }}
+            items:
+              - key: {{ .Values.propertyFileName }}
+                path: {{ .Values.propertyFileName }}
+        - name: pubsub-spanner-key
+          secret:
+            secretName: {{ .Values.pubSubSpannerSecretName }}
+        - name: cert-path
+          projected:
+            sources:
+            {{- if .Values.certPathSecretName }}
+            - secret:
+                name: {{ .Values.certPathSecretName }}
+            {{- end }}
+            {{- if .Values.jksSecretName }}
+            - secret:
+                name: {{ .Values.jksSecretName }}
+            {{- end }}
+            {{- if .Values.mchubSecretName }}
+            - secret:
+                name: {{ .Values.mchubSecretName }}
+            {{- end }}
+            {{- if .Values.essecret }}
+            - secret:
+                name: {{ .Values.essecret }}
+            {{- end }}
+            {{- if .Values.loyaltysecret }}
+            - secret:
+                name: {{ .Values.loyaltysecret }}
+            {{- end }}
+            {{- if .Values.redfrogSecretName }}
+            - secret:
+                name: {{ .Values.redfrogSecretName }}
+            {{- end }}
+            
