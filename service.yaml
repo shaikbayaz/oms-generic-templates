@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Values.nameSpace }}
+  labels:
+    app: {{ .Release.Name }}
+  {{- if eq .Values.svcType "LoadBalancer"}}
+  annotations:
+    cloud.google.com/load-balancer-type: Internal
+  {{- end}}
+spec:
+  type: {{ .Values.svcType }}
+  ports:
+    - port: {{ .Values.svcPort }}
+      name: http
+      {{- if eq .Values.svcType "LoadBalancer"}}
+      targetPort: {{ .Values.containerPort }}
+      {{- end}}
+  selector:
+    app: {{ .Release.Name }}
+    cluster: {{ .Values.cluster }}
