@@ -1,0 +1,49 @@
+{{- if .Values.ingressEnabled }}
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Values.nameSpace }}
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: {{ .Values.connectTimeout | quote }}
+    nginx.ingress.kubernetes.io/proxy-send-timeout: {{ .Values.sendTimeout | quote }}
+    nginx.ingress.kubernetes.io/proxy-read-timeout: {{ .Values.readTimeout | quote }}
+    {{- if .Values.canaryEnabled }}
+    nginx.ingress.kubernetes.io/canary: "true"
+    nginx.ingress.kubernetes.io/canary-by-header: {{ .Values.canaryHeader }}
+    nginx.ingress.kubernetes.io/canary-weight: {{ .Values.canaryWeight | quote }}
+    {{- end }}
+spec:
+  {{- if .Values.nginxExternal }}
+  tls:
+    - hosts:
+      - {{ .Values.ingressHost }}
+      secretName: {{ .Values.tlsSecret }}
+  rules: 
+    {{- $root := . -}}
+    {{- range  .Values.ingressExternalHost }}
+    - host: {{ .  }}
+      http:
+        paths:
+          - path: {{ $root.Values.httpPath }}
+            backend:
+              serviceName: {{ $root.Release.Name }}
+              servicePort: {{ $root.Values.svcPort | default 80 }}
+    {{- end }}
+  {{- else }}
+  tls:
+    - hosts:
+      - {{ .Values.ingressHost }}
+      secretName: {{ .Values.tlsSecret }}
+  rules:
+    - host: {{ .Values.ingressHost }}
+      http:
+        paths:
+          - path: {{ .Values.httpPath }}
+            backend:
+              serviceName: {{ .Release.Name }}
+              servicePort: {{ .Values.svcPort }}
+  {{- end }}
+{{- end }}              
