@@ -1,0 +1,24 @@
+{{- if .Values.monitorEnabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ .Release.Name }}
+  namespace: monitoring
+  labels:
+    team: {{ .Values.Team}}
+spec:
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}
+  namespaceSelector:
+    any: true
+  endpoints:
+  - targetPort: {{ .Values.TargetPort }}
+    interval: "{{ .Values.Interval }}"
+    path: "{{ .Values.Metrics }}"
+    relabelings:
+      - sourceLabels: [__meta_kubernetes_service_name]
+        targetLabel: "application"
+      - sourceLabels: [__meta_kubernetes_namespace]
+        targetLabel: "ns"
+{{- end }} 
